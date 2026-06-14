@@ -1,0 +1,361 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #f4f4f8;
+  color: #1a1a2e;
+}
+
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 0 40px 0;
+}
+
+/* CABECERA */
+.header {
+  background: #000000;
+  color: white;
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.header p {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+/* PERFIL */
+.perfil {
+  background: white;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #EEEDFE;
+  color: #000000;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.perfil-info h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.perfil-info p {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.badge {
+  background: #EEEDFE;
+  color: #4A3DB5;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* SECCIONES */
+.seccion {
+  background: white;
+  padding: 20px 24px;
+  margin-top: 12px;
+}
+
+.seccion h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: #1a1a2e;
+}
+
+/* SERVICIOS */
+.servicios {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.servicio {
+  border: 1.5px solid #eeeeee;
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.servicio.activo {
+  border-color: #333333;
+  background: #e0e0e0;
+}
+
+.servicio .nombre {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.servicio .duracion {
+  font-size: 12px;
+  color: #888;
+  margin-top: 3px;
+}
+
+.servicio .precio {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000000;
+}
+
+/* DÍAS */
+.dias {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.dia {
+  min-width: 52px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1.5px solid #eeeeee;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.dia.activo {
+  border-color: #333333;
+  background: #e0e0e0;
+}
+
+.dia.deshabilitado {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dia-nombre {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.dia-numero {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.dia.activo .dia-numero {
+  color: #000000;
+}
+
+/* HORAS */
+.horas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.hora {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1.5px solid #eeeeee;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.hora.activo {
+  border-color: #333333;
+  background: #e0e0e0;
+  color: #000000;
+}
+
+.hora.ocupada {
+  background: #f4f4f8;
+  color: #bbbbbb;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  border-color: #eeeeee;
+}
+
+/* BOTÓN RESERVAR */
+.btn-reservar {
+  width: 100%;
+  padding: 16px;
+  background: #000000;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-reservar.deshabilitado {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+/* CONFIRMACIÓN */
+.confirmacion {
+  background: #EAF3DE;
+  color: #2D7D46;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* FORMULARIO */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.campo label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+.campo input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #eeeeee;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  color: #1a1a2e;
+}
+
+.campo input:focus {
+  border-color: #000000;
+}
+
+/* RESUMEN */
+.resumen {
+  background: #f4f4f8;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detalle-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detalle-label {
+  font-size: 13px;
+  color: #888;
+}
+
+.detalle-valor {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.precio-final {
+  color: #000000;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* BOTÓN VOLVER */
+.btn-volver {
+  background: none;
+  border: none;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* PANTALLA CONFIRMACIÓN */
+.confirmacion-pantalla {
+  background: white;
+  margin: 16px 12px;
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.confirmacion-icono {
+  font-size: 52px;
+  margin-bottom: 16px;
+}
+
+.confirmacion-pantalla h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+
+.confirmacion-nombre {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.confirmacion-detalle {
+  background: #f4f4f8;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.confirmacion-sub {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 24px;
+}

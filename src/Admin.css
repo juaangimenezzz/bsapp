@@ -1,0 +1,395 @@
+.admin {
+  min-height: 100vh;
+  background: #f4f4f8;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* CABECERA */
+.admin-header {
+  background: #000000;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-header h1 {
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.admin-tag {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.admin-perfil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 14px;
+}
+
+.admin-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* NAVEGACIÓN */
+.admin-nav {
+  background: white;
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #eeeeee;
+  overflow-x: auto;
+}
+
+.admin-nav button {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.admin-nav button.activo {
+  background: #e0e0e0;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* CONTENIDO */
+.admin-contenido {
+  padding: 20px 16px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.admin-contenido h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+.admin-contenido h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* MÉTRICAS */
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.metrica {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.metrica-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.metrica-valor {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.metrica-valor.purple { color: #000000; }
+.metrica-valor.green { color: #2D7D46; }
+
+/* CITAS */
+.citas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cita-row {
+  background: white;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 4px solid #eeeeee;
+}
+
+.cita-row.confirmada { border-left-color: #000000; }
+.cita-row.pendiente { border-left-color: #F59E0B; }
+.cita-row.completada { border-left-color: #2D7D46; }
+.cita-row.cancelada { border-left-color: #EF4444; opacity: 0.5; }
+
+.cita-hora {
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
+  min-width: 48px;
+}
+
+.cita-info {
+  flex: 1;
+}
+
+.cita-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.cita-servicio {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.cita-precio {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4A3DB5;
+  min-width: 36px;
+  text-align: right;
+}
+
+.cita-acciones {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.cita-estado {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.cita-estado.confirmada { background: #e0e0e0; color: #000000; }
+.cita-estado.completada { background: #f4f4f8; color: #888; }
+.cita-estado.cancelada { background: #FEE2E2; color: #EF4444; }
+
+.btn-confirmar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #EEEDFE;
+  color: #4A3DB5;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btn-cancelar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #FEE2E2;
+  color: #EF4444;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* SERVICIOS */
+.servicios-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.servicio-admin {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.servicio-nombre {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.servicio-meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.servicio-derecha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.servicio-precio {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000000;
+}
+
+.btn-editar {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #000000;
+  background: transparent;
+  color: #000000;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-añadir {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px dashed #000000;
+  background: transparent;
+  color: #000000;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* PERFIL */
+.perfil-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.perfil-avatar-grande {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #000000;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+}
+
+.campo-admin label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+.campo-admin input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #eeeeee;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  color: #1a1a2e;
+}
+
+.campo-admin input:focus {
+  border-color: #4A3DB5;
+}
+
+.enlace-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f4f4f8;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #EF4444;
+  font-weight: 500;
+}
+
+.btn-copiar {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #000000;
+  background: transparent;
+  color: #000000;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-guardar {
+  width: 100%;
+  padding: 14px;
+  background: #000000;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.input-editar {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid #000000;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  color: #1a1a2e;
+}
+
+.btn-guardar-servicio {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #000000;
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-cancelar-servicio {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1.5px solid #eeeeee;
+  background: transparent;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+}
