@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from './supabase';
 import './App.css';
 
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 function ClienteApp() {
+  const { slug } = useParams();
   const [paso, setPaso] = useState(1);
   const [servicios, setServicios] = useState([]);
   const [servicioSeleccionado, setServicioSeleccionado] = useState(null);
@@ -18,7 +20,7 @@ function ClienteApp() {
   const [diasDisponibles, setDiasDisponibles] = useState([]);
   const [horasPorDia, setHorasPorDia] = useState({});
   const [cargando, setCargando] = useState(true);
-
+  const [barberoId, setBarberoId] = useState(null);
   const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null });
   const servicioInfo = servicios.find(s => s.nombre === servicioSeleccionado);
 
@@ -37,22 +39,30 @@ function ClienteApp() {
     return fecha.toISOString().split('T')[0];
   };
 
-  // Cargar servicios y disponibilidad al inicio
   useEffect(() => {
     const cargarDatos = async () => {
       setCargando(true);
 
-      // Cargar datos del barbero
-      const { data: barberoData } = await supabase
-        .from('barberos')
-        .select('nombre, ciudad, avatar_url')
-        .single();
-      if (barberoData) setBarbero(barberoData);
+      // Buscar barbero por slug o coger el primero si no hay slug
+      let query = supabase.from('barberos').select('*');
+      if (slug) {
+        query = query.eq('slug', slug);
+      }
+      const { data: barberoData } = await query.single();
 
-      // Cargar servicios desde Supabase
+      if (!barberoData) {
+        setCargando(false);
+        return;
+      }
+
+      setBarbero(barberoData);
+      setBarberoId(barberoData.id);
+
+      // Cargar servicios del barbero
       const { data: serviciosData } = await supabase
         .from('servicios')
         .select('*')
+        .eq('barbero_id', barberoData.id)
         .order('created_at', { ascending: true });
 
       if (serviciosData && serviciosData.length > 0) {
@@ -66,10 +76,11 @@ function ClienteApp() {
         setServicioSeleccionado(serviciosFormateados[0].nombre);
       }
 
-      // Cargar disponibilidad
+      // Cargar disponibilidad del barbero
       const { data: dispData } = await supabase
         .from('disponibilidad')
         .select('*')
+        .eq('barbero_id', barberoData.id)
         .eq('activo', true);
 
       if (dispData && dispData.length > 0) {
@@ -87,17 +98,17 @@ function ClienteApp() {
       setCargando(false);
     };
     cargarDatos();
-  }, []);
+  }, [slug]);
 
-  // Cargar horas ocupadas cuando cambia el día
   useEffect(() => {
-    if (!diaSeleccionado) return;
+    if (!diaSeleccionado || !barberoId) return;
     const cargarHorasOcupadas = async () => {
       const fecha = formatearFecha(obtenerFecha(diaSeleccionado));
       const { data, error } = await supabase
         .from('reservas')
         .select('hora')
         .eq('fecha', fecha)
+        .eq('barbero_id', barberoId)
         .neq('estado', 'cancelada');
       if (!error && data) {
         setHorasOcupadas(data.map(r => r.hora.slice(0, 5)));
@@ -106,7 +117,7 @@ function ClienteApp() {
     cargarHorasOcupadas();
     setHoraSeleccionada(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diaSeleccionado]);
+  }, [diaSeleccionado, barberoId]);
 
   const horas = diaSeleccionado
     ? (horasPorDia[diaSeleccionado] || []).sort().map(hora => ({
@@ -136,7 +147,7 @@ function ClienteApp() {
     const { error } = await supabase
       .from('reservas')
       .insert([{
-        barbero_id: null,
+        barbero_id: barberoId,
         servicio_id: null,
         cliente_nombre: nombre,
         cliente_telefono: telefono,
@@ -163,6 +174,18 @@ function ClienteApp() {
           <p>Reserva tu cita de la manera más sencilla</p>
         </header>
         <div style={{padding:'40px',textAlign:'center',color:'#888'}}>Cargando...</div>
+      </div>
+    );
+  }
+
+  if (!barbero.nombre) {
+    return (
+      <div className="app">
+        <header className="header">
+          <h1>BSAPP</h1>
+          <p>Reserva tu cita de la manera más sencilla</p>
+        </header>
+        <div style={{padding:'40px',textAlign:'center',color:'#888'}}>Barbero no encontrado.</div>
       </div>
     );
   }

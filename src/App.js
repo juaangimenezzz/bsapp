@@ -7,6 +7,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<ClienteApp />} />
+        <Route path="/b/:slug" element={<ClienteApp />} />
         <Route path="/admin" element={<Admin />} />
       </Routes>
     </BrowserRouter>

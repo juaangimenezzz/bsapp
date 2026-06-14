@@ -17,6 +17,7 @@ function Admin() {
   const [sesion, setSesion] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
   const [barberoIdReal, setBarberoIdReal] = useState(null);
+  const [barberoSlug, setBarberoSlug] = useState('');
 
   const [servicios, setServicios] = useState([]);
   const [editandoServicio, setEditandoServicio] = useState(null);
@@ -62,6 +63,7 @@ function Admin() {
 
     if (barbero) {
       setBarberoIdReal(barbero.id);
+      setBarberoSlug(barbero.slug || '');
       setPerfilNombre(barbero.nombre || '');
       setPerfilCiudad(barbero.ciudad || '');
       setPerfilAvatarUrl(barbero.avatar_url || null);
@@ -262,6 +264,25 @@ function Admin() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const copiarEnlace = () => {
+    const url = barberoSlug
+      ? `https://bsapp-xi.vercel.app/b/${barberoSlug}`
+      : 'https://bsapp-xi.vercel.app';
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(() => {
+        setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
+      });
+    } else {
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
+    }
   };
 
   if (!sesionCargada) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#000',fontSize:'18px'}}>Cargando...</div>;
@@ -550,23 +571,10 @@ function Admin() {
             <div className="campo-admin">
               <label>Tu enlace de reservas</label>
               <div className="enlace-box">
-                <span>bsapp-xi.vercel.app</span>
-                <button className="btn-copiar" onClick={() => {
-                  const url = 'https://bsapp-xi.vercel.app';
-                  if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(url).then(() => {
-                      setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
-                    });
-                  } else {
-                    const el = document.createElement('textarea');
-                    el.value = url;
-                    document.body.appendChild(el);
-                    el.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(el);
-                    setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
-                  }
-                }}>Copiar</button>
+                <span style={{color:'#EF4444',fontSize:'13px'}}>
+                  {barberoSlug ? `bsapp-xi.vercel.app/b/${barberoSlug}` : 'bsapp-xi.vercel.app'}
+                </span>
+                <button className="btn-copiar" onClick={copiarEnlace}>Copiar</button>
               </div>
             </div>
             {mensajePerfil && (
