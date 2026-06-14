@@ -81,6 +81,7 @@
   font-size: 15px;
   outline: none;
   color: #1a1a1a;
+  background: #f0f0f0;
 }
 
 .campo-login input:focus {
