@@ -1,6 +1,6 @@
 .login-fondo {
   min-height: 100vh;
-  background: #4A3DB5;
+  background: #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,7 +23,7 @@
 .login-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #4A3DB5;
+  color: #000000;
   margin-bottom: 6px;
 }
 
@@ -54,7 +54,7 @@
 
 .login-tabs button.activo {
   background: white;
-  color: #4A3DB5;
+  color: #000000;
   font-weight: 600;
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
@@ -80,17 +80,17 @@
   border-radius: 10px;
   font-size: 15px;
   outline: none;
-  color: #1a1a2e;
+  color: #1a1a1a;
 }
 
 .campo-login input:focus {
-  border-color: #4A3DB5;
+  border-color: #000000;
 }
 
 .btn-login {
   width: 100%;
   padding: 14px;
-  background: #4A3DB5;
+  background: #000000;
   color: white;
   border: none;
   border-radius: 12px;
