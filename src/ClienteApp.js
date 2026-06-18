@@ -21,7 +21,7 @@ function ClienteApp() {
   const [horasPorDia, setHorasPorDia] = useState({});
   const [cargando, setCargando] = useState(true);
   const [barberoId, setBarberoId] = useState(null);
-  const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null });
+  const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null, calendar_id: null });
   const servicioInfo = servicios.find(s => s.nombre === servicioSeleccionado);
 
   const obtenerFecha = (nombreDia) => {
@@ -43,7 +43,6 @@ function ClienteApp() {
     const cargarDatos = async () => {
       setCargando(true);
 
-      // Buscar barbero por slug o coger el primero si no hay slug
       let query = supabase.from('barberos').select('*');
       if (slug) {
         query = query.eq('slug', slug);
@@ -58,7 +57,6 @@ function ClienteApp() {
       setBarbero(barberoData);
       setBarberoId(barberoData.id);
 
-      // Cargar servicios del barbero
       const { data: serviciosData } = await supabase
         .from('servicios')
         .select('*')
@@ -69,14 +67,14 @@ function ClienteApp() {
         const serviciosFormateados = serviciosData.map(s => ({
           id: s.id,
           nombre: s.nombre,
-          duracion: `${s.duracion} min`,
+          duracion: s.duracion,
+          duracionTexto: `${s.duracion} min`,
           precio: `${s.precio}€`,
         }));
         setServicios(serviciosFormateados);
         setServicioSeleccionado(serviciosFormateados[0].nombre);
       }
 
-      // Cargar disponibilidad del barbero
       const { data: dispData } = await supabase
         .from('disponibilidad')
         .select('*')
@@ -144,7 +142,7 @@ function ClienteApp() {
     const precioNumerico = parseInt(servicioInfo.precio.replace('€', ''), 10);
     const fecha = formatearFecha(obtenerFecha(diaSeleccionado));
 
-    const { error } = await supabase
+    const { error: errorReserva } = await supabase
       .from('reservas')
       .insert([{
         barbero_id: barberoId,
@@ -157,13 +155,34 @@ function ClienteApp() {
         precio: precioNumerico
       }]);
 
-    setGuardando(false);
-
-    if (error) {
+    if (errorReserva) {
       setError('Ha habido un error al guardar la reserva. Inténtalo de nuevo.');
-    } else {
-      setPaso(3);
+      setGuardando(false);
+      return;
     }
+
+    // Crear evento en Google Calendar si el barbero tiene calendar_id
+    if (barbero.calendar_id) {
+      try {
+        await fetch('/api/crear-evento-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            calendarId: barbero.calendar_id,
+            fecha,
+            hora: horaSeleccionada,
+            clienteNombre: nombre,
+            servicio: servicioSeleccionado,
+            duracion: servicioInfo.duracion,
+          }),
+        });
+      } catch (e) {
+        console.error('Error creando evento en calendar:', e);
+      }
+    }
+
+    setGuardando(false);
+    setPaso(3);
   };
 
   if (cargando) {
@@ -332,7 +351,7 @@ function ClienteApp() {
               >
                 <div>
                   <p className="nombre">{s.nombre}</p>
-                  <p className="duracion">⏱ {s.duracion}</p>
+                  <p className="duracion">⏱ {s.duracionTexto}</p>
                 </div>
                 <p className="precio">{s.precio}</p>
               </div>
