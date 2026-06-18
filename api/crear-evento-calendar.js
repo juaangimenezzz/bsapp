@@ -18,18 +18,18 @@ export default async function handler(req, res) {
     const calendar = google.calendar({ version: 'v3', auth });
 
     const [horas, minutos] = hora.split(':').map(Number);
-    const inicio = new Date(`${fecha}T${hora}:00`);
-    const fin = new Date(inicio.getTime() + duracion * 60000);
-
-    const formatear = (date) => date.toISOString();
+    const inicioStr = `${fecha}T${String(horas).padStart(2,'0')}:${String(minutos).padStart(2,'0')}:00`;
+    
+    const inicioDate = new Date(`${inicioStr}+02:00`);
+    const finDate = new Date(inicioDate.getTime() + duracion * 60000);
 
     await calendar.events.insert({
       calendarId: calendarId,
       requestBody: {
         summary: `${servicio} - ${clienteNombre}`,
         description: `Reserva de ${clienteNombre} para ${servicio}`,
-        start: { dateTime: formatear(inicio), timeZone: 'Europe/Madrid' },
-        end: { dateTime: formatear(fin), timeZone: 'Europe/Madrid' },
+        start: { dateTime: inicioStr, timeZone: 'Europe/Madrid' },
+        end: { dateTime: `${fecha}T${String(horas + Math.floor((minutos + duracion) / 60)).padStart(2,'0')}:${String((minutos + duracion) % 60).padStart(2,'0')}:00`, timeZone: 'Europe/Madrid' },
       },
     });
 
