@@ -18,6 +18,7 @@ function Admin() {
   const [sesionCargada, setSesionCargada] = useState(false);
   const [barberoIdReal, setBarberoIdReal] = useState(null);
   const [barberoSlug, setBarberoSlug] = useState('');
+  const [barberoCalendarId, setBarberoCalendarId] = useState(null);
 
   const [servicios, setServicios] = useState([]);
   const [editandoServicio, setEditandoServicio] = useState(null);
@@ -64,6 +65,7 @@ function Admin() {
     if (barbero) {
       setBarberoIdReal(barbero.id);
       setBarberoSlug(barbero.slug || '');
+      setBarberoCalendarId(barbero.calendar_id || null);
       setPerfilNombre(barbero.nombre || '');
       setPerfilCiudad(barbero.ciudad || '');
       setPerfilAvatarUrl(barbero.avatar_url || null);
@@ -85,6 +87,7 @@ function Admin() {
           id: s.id,
           nombre: s.nombre,
           duracion: `${s.duracion} min`,
+          duracionNum: s.duracion,
           precio: `${s.precio}€`,
         })));
       }
@@ -184,7 +187,7 @@ function Admin() {
       .select()
       .single();
     if (!error && data) {
-      setServicios(prev => [...prev, { id: data.id, nombre: data.nombre, duracion: `${data.duracion} min`, precio: `${data.precio}€` }]);
+      setServicios(prev => [...prev, { id: data.id, nombre: data.nombre, duracion: `${data.duracion} min`, duracionNum: data.duracion, precio: `${data.precio}€` }]);
       setEditandoServicio(servicios.length);
       setServicioEditado({ nombre: data.nombre, duracion: `${data.duracion} min`, precio: `${data.precio}€` });
     }
@@ -244,6 +247,30 @@ function Admin() {
       .from('reservas')
       .update({ estado: nuevoEstado })
       .eq('id', id);
+
+    if (!error && nuevoEstado === 'confirmada' && barberoCalendarId) {
+      const reserva = reservas.find(r => r.id === id);
+      if (reserva) {
+        const servicioReserva = servicios.find(s => s.nombre === reserva.servicio_nombre) || servicios[0];
+        try {
+          await fetch('/api/crear-evento-calendar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              calendarId: barberoCalendarId,
+              fecha: reserva.fecha,
+              hora: reserva.hora.slice(0, 5),
+              clienteNombre: reserva.cliente_nombre,
+              servicio: reserva.servicio_nombre || 'Servicio',
+              duracion: servicioReserva?.duracionNum || 30,
+            }),
+          });
+        } catch (e) {
+          console.error('Error creando evento en calendar:', e);
+        }
+      }
+    }
+
     if (!error) cargarDatos();
   };
 
