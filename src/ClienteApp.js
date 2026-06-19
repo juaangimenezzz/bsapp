@@ -22,6 +22,15 @@ function ClienteApp() {
   const [cargando, setCargando] = useState(true);
   const [barberoId, setBarberoId] = useState(null);
   const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null, calendar_id: null });
+
+  // Estados para cancelación
+  const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
+  const [telefonoCancelacion, setTelefonoCancelacion] = useState('');
+  const [reservasCliente, setReservasCliente] = useState([]);
+  const [buscandoReservas, setBuscandoReservas] = useState(false);
+  const [cancelando, setCancelando] = useState(null);
+  const [mensajeCancelacion, setMensajeCancelacion] = useState(null);
+
   const servicioInfo = servicios.find(s => s.nombre === servicioSeleccionado);
 
   const obtenerFecha = (nombreDia) => {
@@ -161,7 +170,6 @@ function ClienteApp() {
       return;
     }
 
-    // Crear evento en Google Calendar si el barbero tiene calendar_id
     if (barbero.calendar_id) {
       try {
         await fetch('/api/crear-evento-calendar', {
@@ -185,6 +193,55 @@ function ClienteApp() {
     setPaso(3);
   };
 
+  const buscarReservas = async () => {
+    if (telefonoCancelacion.length !== 9) return;
+    setBuscandoReservas(true);
+    setMensajeCancelacion(null);
+    const hoy = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('reservas')
+      .select('*')
+      .eq('cliente_telefono', telefonoCancelacion)
+      .eq('barbero_id', barberoId)
+      .neq('estado', 'cancelada')
+      .gte('fecha', hoy)
+      .order('fecha', { ascending: true });
+    if (!error) setReservasCliente(data || []);
+    setBuscandoReservas(false);
+  };
+
+  const cancelarReserva = async (reserva) => {
+    setCancelando(reserva.id);
+    const { error } = await supabase
+      .from('reservas')
+      .update({ estado: 'cancelada' })
+      .eq('id', reserva.id);
+
+    if (!error) {
+      if (barbero.calendar_id) {
+        try {
+          await fetch('/api/eliminar-evento-calendar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              calendarId: barbero.calendar_id,
+              fecha: reserva.fecha,
+              hora: reserva.hora.slice(0, 5),
+              clienteNombre: reserva.cliente_nombre,
+            }),
+          });
+        } catch (e) {
+          console.error('Error eliminando evento:', e);
+        }
+      }
+      setReservasCliente(prev => prev.filter(r => r.id !== reserva.id));
+      setMensajeCancelacion({ tipo: 'ok', texto: '¡Cita cancelada correctamente!' });
+    } else {
+      setMensajeCancelacion({ tipo: 'error', texto: 'Error al cancelar. Inténtalo de nuevo.' });
+    }
+    setCancelando(null);
+  };
+
   if (cargando) {
     return (
       <div className="app">
@@ -205,6 +262,81 @@ function ClienteApp() {
           <p>Reserva tu cita de la manera más sencilla</p>
         </header>
         <div style={{padding:'40px',textAlign:'center',color:'#888'}}>Barbero no encontrado.</div>
+      </div>
+    );
+  }
+
+  if (mostrarCancelacion) {
+    return (
+      <div className="app">
+        <header className="header">
+          <h1>BSAPP</h1>
+          <p>Reserva tu cita de la manera más sencilla</p>
+        </header>
+        <div className="seccion">
+          <button className="btn-volver" onClick={() => { setMostrarCancelacion(false); setTelefonoCancelacion(''); setReservasCliente([]); setMensajeCancelacion(null); }}>← Volver</button>
+          <h3 style={{marginTop:'12px'}}>Cancelar mi cita</h3>
+          <p style={{color:'#888',fontSize:'14px',marginBottom:'16px'}}>Introduce tu número de teléfono para ver tus reservas activas.</p>
+          <div className="formulario">
+            <div className="campo">
+              <label>Tu teléfono</label>
+              <input
+                type="tel"
+                placeholder="Ej: 612345678"
+                value={telefonoCancelacion}
+                onChange={e => setTelefonoCancelacion(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                inputMode="numeric"
+                maxLength={9}
+              />
+            </div>
+          </div>
+          <button
+            className={`btn-reservar ${telefonoCancelacion.length !== 9 ? 'deshabilitado' : ''}`}
+            onClick={buscarReservas}
+            disabled={telefonoCancelacion.length !== 9 || buscandoReservas}
+            style={{marginTop:'16px'}}
+          >
+            {buscandoReservas ? 'Buscando...' : 'Buscar mis citas'}
+          </button>
+
+          {mensajeCancelacion && (
+            <p style={{
+              padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginTop:'16px',
+              background: mensajeCancelacion.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',
+              color: mensajeCancelacion.tipo === 'ok' ? '#2D7D46' : '#EF4444'
+            }}>{mensajeCancelacion.texto}</p>
+          )}
+
+          {reservasCliente.length > 0 && (
+            <div style={{marginTop:'20px',display:'flex',flexDirection:'column',gap:'12px'}}>
+              <h3>Tus citas activas</h3>
+              {reservasCliente.map(r => (
+                <div key={r.id} style={{background:'white',borderRadius:'12px',padding:'16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <p style={{fontWeight:'600',fontSize:'15px',color:'#1a1a2e'}}>{r.fecha}</p>
+                    <p style={{fontSize:'13px',color:'#888',marginTop:'4px'}}>{r.hora?.slice(0,5)} · {r.cliente_nombre}</p>
+                    <p style={{fontSize:'12px',color:'#aaa',marginTop:'2px',textTransform:'capitalize'}}>{r.estado}</p>
+                  </div>
+                  <button
+                    onClick={() => cancelarReserva(r)}
+                    disabled={cancelando === r.id}
+                    style={{
+                      padding:'8px 16px',borderRadius:'8px',border:'none',
+                      background:'#EF4444',color:'white',fontSize:'13px',
+                      fontWeight:'600',cursor:'pointer'
+                    }}
+                  >
+                    {cancelando === r.id ? 'Cancelando...' : 'Cancelar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!buscandoReservas && reservasCliente.length === 0 && telefonoCancelacion.length === 9 && mensajeCancelacion === null && (
+            <p style={{color:'#888',fontSize:'14px',marginTop:'16px',textAlign:'center'}}>No se han encontrado citas activas con este número.</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -336,7 +468,18 @@ function ClienteApp() {
           <h2>{barbero.nombre || 'Cargando...'}</h2>
           <p>📍 {barbero.ciudad || ''}</p>
         </div>
+        <button
+          onClick={() => setMostrarCancelacion(true)}
+          style={{
+            marginLeft:'auto',padding:'8px 16px',borderRadius:'8px',
+            border:'none',background:'#EF4444',color:'white',
+            fontSize:'13px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'
+          }}
+        >
+          Cancelar cita
+        </button>
       </div>
+
       <div className="seccion">
         <h3>Elige tu servicio</h3>
         {servicios.length === 0 ? (
