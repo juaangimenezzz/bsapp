@@ -6,10 +6,8 @@ import './Admin.css';
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const HORAS_DISPONIBLES = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30',
-  '21:00', '21:30', '22:00',
+  '12:00', '12:30', '16:00', '16:30', '17:00', '17:30',
+  '18:00', '18:30',
 ];
 
 function Admin() {
@@ -19,8 +17,6 @@ function Admin() {
   const [sesion, setSesion] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
   const [barberoIdReal, setBarberoIdReal] = useState(null);
-  const [barberoSlug, setBarberoSlug] = useState('');
-  const [barberoCalendarId, setBarberoCalendarId] = useState(null);
 
   const [servicios, setServicios] = useState([]);
   const [editandoServicio, setEditandoServicio] = useState(null);
@@ -36,9 +32,58 @@ function Admin() {
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const inputFotoRef = useRef(null);
 
+  const [faceIdRegistrado, setFaceIdRegistrado] = useState(!!localStorage.getItem('bsapp_cred_id'));
+
   const [disponibilidad, setDisponibilidad] = useState({});
   const [guardandoHorario, setGuardandoHorario] = useState(false);
   const [mensajeHorario, setMensajeHorario] = useState(null);
+
+  const bufferToBase64 = (buffer) => {
+    const bin = String.fromCharCode(...new Uint8Array(buffer));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  };
+
+  const activarFaceId = async () => {
+    if (!window.PublicKeyCredential) {
+      setMensajePerfil({ tipo: 'error', texto: 'Tu dispositivo no soporta Face ID.' });
+      return;
+    }
+    try {
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      const userEmail = sesion.user.email;
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'BSAPP', id: window.location.hostname },
+          user: {
+            id: new TextEncoder().encode(userEmail),
+            name: userEmail,
+            displayName: perfilNombre || userEmail,
+          },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+          timeout: 60000,
+        },
+      });
+      if (credential) {
+        localStorage.setItem('bsapp_cred_id', bufferToBase64(credential.rawId));
+        localStorage.setItem('bsapp_email', userEmail);
+        setFaceIdRegistrado(true);
+        setMensajePerfil({ tipo: 'ok', texto: '¡Face ID activado! La próxima vez entra sin contraseña.' });
+      }
+    } catch (err) {
+      setMensajePerfil({ tipo: 'error', texto: 'Face ID cancelado o no disponible.' });
+    }
+  };
+
+  const desactivarFaceId = () => {
+    localStorage.removeItem('bsapp_cred_id');
+    localStorage.removeItem('bsapp_email');
+    localStorage.removeItem('bsapp_password');
+    setFaceIdRegistrado(false);
+    setMensajePerfil({ tipo: 'ok', texto: 'Face ID desactivado.' });
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -66,39 +111,23 @@ function Admin() {
 
     if (barbero) {
       setBarberoIdReal(barbero.id);
-      setBarberoSlug(barbero.slug || '');
-      setBarberoCalendarId(barbero.calendar_id || null);
       setPerfilNombre(barbero.nombre || '');
       setPerfilCiudad(barbero.ciudad || '');
       setPerfilAvatarUrl(barbero.avatar_url || null);
 
       const { data: reservasData, error: reservasError } = await supabase
-        .from('reservas')
-        .select('*')
-        .eq('barbero_id', barbero.id)
-        .order('hora', { ascending: true });
+        .from('reservas').select('*').eq('barbero_id', barbero.id).order('hora', { ascending: true });
       if (!reservasError) setReservas(reservasData);
 
       const { data: serviciosData } = await supabase
-        .from('servicios')
-        .select('*')
-        .eq('barbero_id', barbero.id)
-        .order('created_at', { ascending: true });
+        .from('servicios').select('*').eq('barbero_id', barbero.id).order('created_at', { ascending: true });
       if (serviciosData) {
         setServicios(serviciosData.map(s => ({
-          id: s.id,
-          nombre: s.nombre,
-          duracion: `${s.duracion} min`,
-          duracionNum: s.duracion,
-          precio: `${s.precio}€`,
+          id: s.id, nombre: s.nombre, duracion: `${s.duracion} min`, precio: `${s.precio}€`,
         })));
       }
 
-      const { data: disp } = await supabase
-        .from('disponibilidad')
-        .select('*')
-        .eq('barbero_id', barbero.id);
-
+      const { data: disp } = await supabase.from('disponibilidad').select('*').eq('barbero_id', barbero.id);
       if (disp && disp.length > 0) {
         const dispMap = {};
         DIAS_SEMANA.forEach(dia => { dispMap[dia] = { activo: false, horas: [] }; });
@@ -120,40 +149,17 @@ function Admin() {
   const handleSubirFoto = async (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;
-
     setSubiendoFoto(true);
     setMensajePerfil(null);
-
     const extension = archivo.name.split('.').pop();
     const nombreArchivo = `${barberoIdReal}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatares')
-      .upload(nombreArchivo, archivo, { upsert: true });
-
-    if (uploadError) {
-      setMensajePerfil({ tipo: 'error', texto: 'Error al subir la foto. Inténtalo de nuevo.' });
-      setSubiendoFoto(false);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('avatares')
-      .getPublicUrl(nombreArchivo);
-
+    const { error: uploadError } = await supabase.storage.from('avatares').upload(nombreArchivo, archivo, { upsert: true });
+    if (uploadError) { setMensajePerfil({ tipo: 'error', texto: 'Error al subir la foto.' }); setSubiendoFoto(false); return; }
+    const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(nombreArchivo);
     const avatarUrl = urlData.publicUrl;
-
-    const { error: updateError } = await supabase
-      .from('barberos')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', barberoIdReal);
-
-    if (updateError) {
-      setMensajePerfil({ tipo: 'error', texto: 'Error al guardar la foto. Inténtalo de nuevo.' });
-    } else {
-      setPerfilAvatarUrl(avatarUrl);
-      setMensajePerfil({ tipo: 'ok', texto: '¡Foto actualizada correctamente!' });
-    }
+    const { error: updateError } = await supabase.from('barberos').update({ avatar_url: avatarUrl }).eq('id', barberoIdReal);
+    if (updateError) { setMensajePerfil({ tipo: 'error', texto: 'Error al guardar la foto.' }); }
+    else { setPerfilAvatarUrl(avatarUrl); setMensajePerfil({ tipo: 'ok', texto: '¡Foto actualizada correctamente!' }); }
     setSubiendoFoto(false);
   };
 
@@ -163,15 +169,9 @@ function Admin() {
     const s = servicios[index];
     const duracionNum = parseInt(servicioEditado.duracion?.replace(' min', ''), 10);
     const precioNum = parseInt(servicioEditado.precio?.replace('€', ''), 10);
-
-    const { error } = await supabase
-      .from('servicios')
-      .update({ nombre: servicioEditado.nombre, duracion: duracionNum, precio: precioNum })
-      .eq('id', s.id);
-
-    if (error) {
-      setMensajeServicio({ tipo: 'error', texto: 'Error al guardar. Inténtalo de nuevo.' });
-    } else {
+    const { error } = await supabase.from('servicios').update({ nombre: servicioEditado.nombre, duracion: duracionNum, precio: precioNum }).eq('id', s.id);
+    if (error) { setMensajeServicio({ tipo: 'error', texto: 'Error al guardar.' }); }
+    else {
       const nuevos = [...servicios];
       nuevos[index] = { ...s, nombre: servicioEditado.nombre, duracion: servicioEditado.duracion, precio: servicioEditado.precio };
       setServicios(nuevos);
@@ -183,13 +183,9 @@ function Admin() {
   };
 
   const añadirServicio = async () => {
-    const { data, error } = await supabase
-      .from('servicios')
-      .insert([{ barbero_id: barberoIdReal, nombre: 'Nuevo servicio', duracion: 30, precio: 10 }])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('servicios').insert([{ barbero_id: barberoIdReal, nombre: 'Nuevo servicio', duracion: 30, precio: 10 }]).select().single();
     if (!error && data) {
-      setServicios(prev => [...prev, { id: data.id, nombre: data.nombre, duracion: `${data.duracion} min`, duracionNum: data.duracion, precio: `${data.precio}€` }]);
+      setServicios(prev => [...prev, { id: data.id, nombre: data.nombre, duracion: `${data.duracion} min`, precio: `${data.precio}€` }]);
       setEditandoServicio(servicios.length);
       setServicioEditado({ nombre: data.nombre, duracion: `${data.duracion} min`, precio: `${data.precio}€` });
     }
@@ -198,24 +194,16 @@ function Admin() {
   const eliminarServicio = async (index) => {
     const s = servicios[index];
     const { error } = await supabase.from('servicios').delete().eq('id', s.id);
-    if (!error) {
-      setServicios(prev => prev.filter((_, i) => i !== index));
-      setEditandoServicio(null);
-    }
+    if (!error) { setServicios(prev => prev.filter((_, i) => i !== index)); setEditandoServicio(null); }
   };
 
   const toggleDia = (dia) => {
-    setDisponibilidad(prev => ({
-      ...prev,
-      [dia]: { ...prev[dia], activo: !prev[dia].activo }
-    }));
+    setDisponibilidad(prev => ({ ...prev, [dia]: { ...prev[dia], activo: !prev[dia].activo } }));
   };
 
   const toggleHora = (dia, hora) => {
     setDisponibilidad(prev => {
-      const horas = prev[dia].horas.includes(hora)
-        ? prev[dia].horas.filter(h => h !== hora)
-        : [...prev[dia].horas, hora];
+      const horas = prev[dia].horas.includes(hora) ? prev[dia].horas.filter(h => h !== hora) : [...prev[dia].horas, hora];
       return { ...prev, [dia]: { ...prev[dia], horas } };
     });
   };
@@ -227,89 +215,40 @@ function Admin() {
     const filas = [];
     DIAS_SEMANA.forEach(dia => {
       if (disponibilidad[dia]?.activo) {
-        disponibilidad[dia].horas.forEach(hora => {
-          filas.push({ barbero_id: barberoIdReal, dia_semana: dia, hora, activo: true });
-        });
+        disponibilidad[dia].horas.forEach(hora => { filas.push({ barbero_id: barberoIdReal, dia_semana: dia, hora, activo: true }); });
       }
     });
     if (filas.length > 0) {
       const { error } = await supabase.from('disponibilidad').insert(filas);
-      if (error) {
-        setMensajeHorario({ tipo: 'error', texto: 'Error al guardar. Inténtalo de nuevo.' });
-        setGuardandoHorario(false);
-        return;
-      }
+      if (error) { setMensajeHorario({ tipo: 'error', texto: 'Error al guardar.' }); setGuardandoHorario(false); return; }
     }
     setGuardandoHorario(false);
     setMensajeHorario({ tipo: 'ok', texto: '¡Horario guardado correctamente!' });
   };
 
   const cambiarEstado = async (id, nuevoEstado) => {
-    const { error } = await supabase
-      .from('reservas')
-      .update({ estado: nuevoEstado })
-      .eq('id', id);
-
-    if (!error && nuevoEstado === 'confirmada' && barberoCalendarId) {
-      const reserva = reservas.find(r => r.id === id);
-      if (reserva) {
-        const servicioReserva = servicios.find(s => s.nombre === reserva.servicio_nombre) || servicios[0];
-        try {
-          await fetch('/api/crear-evento-calendar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              calendarId: barberoCalendarId,
-              fecha: reserva.fecha,
-              hora: reserva.hora.slice(0, 5),
-              clienteNombre: reserva.cliente_nombre,
-              servicio: reserva.servicio_nombre || 'Servicio',
-              duracion: servicioReserva?.duracionNum || 30,
-            }),
-          });
-        } catch (e) {
-          console.error('Error creando evento en calendar:', e);
-        }
-      }
-    }
-
+    const { error } = await supabase.from('reservas').update({ estado: nuevoEstado }).eq('id', id);
     if (!error) cargarDatos();
   };
 
   const guardarPerfil = async () => {
     setGuardandoPerfil(true);
     setMensajePerfil(null);
-    const { error } = await supabase
-      .from('barberos')
-      .update({ nombre: perfilNombre, ciudad: perfilCiudad })
-      .eq('id', barberoIdReal);
+    const { error } = await supabase.from('barberos').update({ nombre: perfilNombre, ciudad: perfilCiudad }).eq('id', barberoIdReal);
     setGuardandoPerfil(false);
-    if (error) {
-      setMensajePerfil({ tipo: 'error', texto: 'Error al guardar. Inténtalo de nuevo.' });
-    } else {
-      setMensajePerfil({ tipo: 'ok', texto: '¡Perfil actualizado correctamente!' });
-    }
+    if (error) { setMensajePerfil({ tipo: 'error', texto: 'Error al guardar.' }); }
+    else { setMensajePerfil({ tipo: 'ok', texto: '¡Perfil actualizado correctamente!' }); }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const copiarEnlace = () => {
-    const url = barberoSlug
-      ? `https://bsapp-xi.vercel.app/b/${barberoSlug}`
-      : 'https://bsapp-xi.vercel.app';
+    const url = 'https://bsapp-xi.vercel.app';
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(url).then(() => {
-        setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
-      });
+      navigator.clipboard.writeText(url).then(() => setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' }));
     } else {
       const el = document.createElement('textarea');
-      el.value = url;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
+      el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
       setMensajePerfil({ tipo: 'ok', texto: '¡Enlace copiado al portapapeles!' });
     }
   };
@@ -326,7 +265,6 @@ function Admin() {
       <header className="admin-header">
         <div className="admin-header-left">
           <h1>BSAPP</h1>
-          <span className="admin-tag">Panel del barbero</span>
         </div>
         <div className="admin-perfil">
           <div className="admin-avatar">
@@ -352,40 +290,19 @@ function Admin() {
         <div className="admin-contenido">
           <h2>Resumen de hoy</h2>
           <div className="metricas">
-            <div className="metrica">
-              <p className="metrica-label">Citas totales</p>
-              <p className="metrica-valor purple">{reservasActivas.length}</p>
-            </div>
-            <div className="metrica">
-              <p className="metrica-label">Confirmadas</p>
-              <p className="metrica-valor purple">{confirmadas}</p>
-            </div>
-            <div className="metrica">
-              <p className="metrica-label">Pendientes</p>
-              <p className="metrica-valor">{reservas.filter(r => r.estado === 'pendiente').length}</p>
-            </div>
-            <div className="metrica">
-              <p className="metrica-label">Ingresos est.</p>
-              <p className="metrica-valor green">{ingresos}€</p>
-            </div>
+            <div className="metrica"><p className="metrica-label">Citas totales</p><p className="metrica-valor purple">{reservasActivas.length}</p></div>
+            <div className="metrica"><p className="metrica-label">Confirmadas</p><p className="metrica-valor purple">{confirmadas}</p></div>
+            <div className="metrica"><p className="metrica-label">Pendientes</p><p className="metrica-valor">{reservas.filter(r => r.estado === 'pendiente').length}</p></div>
+            <div className="metrica"><p className="metrica-label">Ingresos est.</p><p className="metrica-valor green">{ingresos}€</p></div>
           </div>
           <h3 style={{marginTop:'24px',marginBottom:'12px'}}>Últimas reservas</h3>
-          {cargando ? (
-            <p style={{color:'#888',fontSize:'14px'}}>Cargando reservas...</p>
-          ) : reservas.length === 0 ? (
-            <p style={{color:'#888',fontSize:'14px'}}>No hay reservas todavía.</p>
-          ) : (
+          {cargando ? <p style={{color:'#888',fontSize:'14px'}}>Cargando reservas...</p> : reservas.length === 0 ? <p style={{color:'#888',fontSize:'14px'}}>No hay reservas todavía.</p> : (
             <div className="citas-lista">
               {reservas.slice(0,5).map((r) => (
                 <div key={r.id} className={`cita-row ${r.estado}`}>
                   <span className="cita-hora">{r.hora?.slice(0,5)}</span>
-                  <div className="cita-info">
-                    <p className="cita-nombre">{r.cliente_nombre}</p>
-                    <p className="cita-servicio">{r.fecha}</p>
-                  </div>
-                  <span className={`cita-estado ${r.estado}`}>
-                    {r.estado === 'confirmada' ? '✓ Confirmada' : r.estado === 'pendiente' ? '⏳ Pendiente' : r.estado}
-                  </span>
+                  <div className="cita-info"><p className="cita-nombre">{r.cliente_nombre}</p><p className="cita-servicio">{r.fecha}</p></div>
+                  <span className={`cita-estado ${r.estado}`}>{r.estado === 'confirmada' ? '✓ Confirmada' : r.estado === 'pendiente' ? '⏳ Pendiente' : r.estado}</span>
                 </div>
               ))}
             </div>
@@ -396,26 +313,14 @@ function Admin() {
       {seccion === 'citas' && (
         <div className="admin-contenido">
           <h2>Todas las reservas</h2>
-          {cargando ? (
-            <p style={{color:'#888',fontSize:'14px'}}>Cargando...</p>
-          ) : reservas.length === 0 ? (
-            <p style={{color:'#888',fontSize:'14px'}}>No hay reservas todavía.</p>
-          ) : (
+          {cargando ? <p style={{color:'#888',fontSize:'14px'}}>Cargando...</p> : reservas.length === 0 ? <p style={{color:'#888',fontSize:'14px'}}>No hay reservas todavía.</p> : (
             <div className="citas-lista">
               {reservas.map((r) => (
                 <div key={r.id} className={`cita-row ${r.estado}`}>
                   <span className="cita-hora">{r.hora?.slice(0,5)}</span>
-                  <div className="cita-info">
-                    <p className="cita-nombre">{r.cliente_nombre}</p>
-                    <p className="cita-servicio">{r.fecha} · {r.cliente_telefono}</p>
-                  </div>
+                  <div className="cita-info"><p className="cita-nombre">{r.cliente_nombre}</p><p className="cita-servicio">{r.fecha} · {r.cliente_telefono}</p></div>
                   <div className="cita-acciones">
-                    {r.estado === 'pendiente' && (
-                      <>
-                        <button className="btn-confirmar" onClick={() => cambiarEstado(r.id, 'confirmada')}>✓</button>
-                        <button className="btn-cancelar" onClick={() => cambiarEstado(r.id, 'cancelada')}>✗</button>
-                      </>
-                    )}
+                    {r.estado === 'pendiente' && (<><button className="btn-confirmar" onClick={() => cambiarEstado(r.id, 'confirmada')}>✓</button><button className="btn-cancelar" onClick={() => cambiarEstado(r.id, 'cancelada')}>✗</button></>)}
                     {r.estado === 'confirmada' && <span className="cita-estado confirmada">✓ Confirmada</span>}
                     {r.estado === 'cancelada' && <span className="cita-estado cancelada">Cancelada</span>}
                   </div>
@@ -435,31 +340,14 @@ function Admin() {
               <div key={dia} style={{background:'white',borderRadius:'12px',padding:'16px'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: disponibilidad[dia]?.activo ? '14px' : '0'}}>
                   <p style={{fontWeight:'600',fontSize:'15px',color:'#1a1a2e'}}>{dia}</p>
-                  <button
-                    onClick={() => toggleDia(dia)}
-                    style={{
-                      padding:'6px 16px',borderRadius:'8px',border:'1.5px solid #000',
-                      background: disponibilidad[dia]?.activo ? '#000' : 'transparent',
-                      color: disponibilidad[dia]?.activo ? 'white' : '#000',
-                      fontSize:'13px',fontWeight:'600',cursor:'pointer'
-                    }}
-                  >
+                  <button onClick={() => toggleDia(dia)} style={{padding:'6px 16px',borderRadius:'8px',border:'1.5px solid #000',background: disponibilidad[dia]?.activo ? '#000' : 'transparent',color: disponibilidad[dia]?.activo ? 'white' : '#000',fontSize:'13px',fontWeight:'600',cursor:'pointer'}}>
                     {disponibilidad[dia]?.activo ? 'Activo' : 'Desactivado'}
                   </button>
                 </div>
                 {disponibilidad[dia]?.activo && (
                   <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
                     {HORAS_DISPONIBLES.map(hora => (
-                      <button
-                        key={hora}
-                        onClick={() => toggleHora(dia, hora)}
-                        style={{
-                          padding:'6px 12px',borderRadius:'8px',border:'1.5px solid #000',
-                          background: disponibilidad[dia]?.horas.includes(hora) ? '#000' : 'transparent',
-                          color: disponibilidad[dia]?.horas.includes(hora) ? 'white' : '#000',
-                          fontSize:'13px',cursor:'pointer'
-                        }}
-                      >
+                      <button key={hora} onClick={() => toggleHora(dia, hora)} style={{padding:'6px 12px',borderRadius:'8px',border:'1.5px solid #000',background: disponibilidad[dia]?.horas.includes(hora) ? '#000' : 'transparent',color: disponibilidad[dia]?.horas.includes(hora) ? 'white' : '#000',fontSize:'13px',cursor:'pointer'}}>
                         {hora}
                       </button>
                     ))}
@@ -468,78 +356,40 @@ function Admin() {
               </div>
             ))}
           </div>
-          {mensajeHorario && (
-            <p style={{
-              padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginTop:'16px',
-              background: mensajeHorario.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',
-              color: mensajeHorario.tipo === 'ok' ? '#2D7D46' : '#EF4444'
-            }}>{mensajeHorario.texto}</p>
-          )}
-          <button className="btn-guardar" onClick={guardarHorario} disabled={guardandoHorario} style={{marginTop:'20px'}}>
-            {guardandoHorario ? 'Guardando...' : 'Guardar horario'}
-          </button>
+          {mensajeHorario && <p style={{padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginTop:'16px',background: mensajeHorario.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',color: mensajeHorario.tipo === 'ok' ? '#2D7D46' : '#EF4444'}}>{mensajeHorario.texto}</p>}
+          <button className="btn-guardar" onClick={guardarHorario} disabled={guardandoHorario} style={{marginTop:'20px'}}>{guardandoHorario ? 'Guardando...' : 'Guardar horario'}</button>
         </div>
       )}
 
       {seccion === 'servicios' && (
         <div className="admin-contenido">
           <h2>Mis servicios</h2>
-          {mensajeServicio && (
-            <p style={{
-              padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginBottom:'12px',
-              background: mensajeServicio.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',
-              color: mensajeServicio.tipo === 'ok' ? '#2D7D46' : '#EF4444'
-            }}>{mensajeServicio.texto}</p>
-          )}
+          {mensajeServicio && <p style={{padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginBottom:'12px',background: mensajeServicio.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',color: mensajeServicio.tipo === 'ok' ? '#2D7D46' : '#EF4444'}}>{mensajeServicio.texto}</p>}
           <div className="servicios-lista">
             {servicios.map((s, i) => (
               <div key={s.id} className="servicio-admin">
                 {editandoServicio === i ? (
                   <div style={{flex:1,display:'flex',flexDirection:'column',gap:'8px'}}>
-                    <input
-                      className="input-editar"
-                      value={servicioEditado.nombre || ''}
-                      onChange={e => setServicioEditado({...servicioEditado, nombre: e.target.value})}
-                      placeholder="Nombre del servicio"
-                    />
+                    <input className="input-editar" value={servicioEditado.nombre || ''} onChange={e => setServicioEditado({...servicioEditado, nombre: e.target.value})} placeholder="Nombre del servicio" />
                     <div style={{display:'flex',gap:'8px'}}>
                       <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #000',borderRadius:'8px',overflow:'hidden'}}>
-                        <input
-                          className="input-editar"
-                          style={{border:'none',flex:1,borderRadius:'0'}}
-                          value={servicioEditado.duracion ? servicioEditado.duracion.replace(' min','') : ''}
-                          onChange={e => setServicioEditado({...servicioEditado, duracion: e.target.value.replace(/\D/g,'') + ' min'})}
-                          placeholder="30"
-                          inputMode="numeric"
-                        />
+                        <input className="input-editar" style={{border:'none',flex:1,borderRadius:'0'}} value={servicioEditado.duracion ? servicioEditado.duracion.replace(' min','') : ''} onChange={e => setServicioEditado({...servicioEditado, duracion: e.target.value.replace(/\D/g,'') + ' min'})} placeholder="30" inputMode="numeric" />
                         <span style={{padding:'0 10px',color:'#888',fontSize:'14px',background:'#f4f4f8',height:'100%',display:'flex',alignItems:'center'}}>min</span>
                       </div>
                       <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #000',borderRadius:'8px',overflow:'hidden'}}>
-                        <input
-                          className="input-editar"
-                          style={{border:'none',flex:1,borderRadius:'0'}}
-                          value={servicioEditado.precio ? servicioEditado.precio.replace('€','') : ''}
-                          onChange={e => setServicioEditado({...servicioEditado, precio: e.target.value.replace(/\D/g,'') + '€'})}
-                          placeholder="12"
-                          inputMode="numeric"
-                        />
+                        <input className="input-editar" style={{border:'none',flex:1,borderRadius:'0'}} value={servicioEditado.precio ? servicioEditado.precio.replace('€','') : ''} onChange={e => setServicioEditado({...servicioEditado, precio: e.target.value.replace(/\D/g,'') + '€'})} placeholder="12" inputMode="numeric" />
                         <span style={{padding:'0 10px',color:'#888',fontSize:'14px',background:'#f4f4f8',height:'100%',display:'flex',alignItems:'center'}}>€</span>
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'8px'}}>
-                      <button className="btn-guardar-servicio" onClick={() => guardarServicio(i)} disabled={guardandoServicio}>
-                        {guardandoServicio ? 'Guardando...' : 'Guardar'}
-                      </button>
+                      <button className="btn-guardar-servicio" onClick={() => guardarServicio(i)} disabled={guardandoServicio}>{guardandoServicio ? 'Guardando...' : 'Guardar'}</button>
                       <button className="btn-cancelar-servicio" onClick={() => { setEditandoServicio(null); setServicioEditado({}); }}>Cancelar</button>
                       <button onClick={() => eliminarServicio(i)} style={{padding:'8px 16px',borderRadius:'8px',border:'none',background:'#FEE2E2',color:'#EF4444',fontSize:'13px',cursor:'pointer'}}>Eliminar</button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div>
-                      <p className="servicio-nombre">{s.nombre}</p>
-                      <p className="servicio-meta">⏱ {s.duracion}</p>
-                    </div>
+                    <div><p className="servicio-nombre">{s.nombre}</p><p className="servicio-meta">⏱ {s.duracion}</p></div>
                     <div className="servicio-derecha">
                       <span className="servicio-precio">{s.precio}</span>
                       <button className="btn-editar" onClick={() => { setEditandoServicio(i); setServicioEditado({...s}); }}>Editar</button>
@@ -557,65 +407,64 @@ function Admin() {
         <div className="admin-contenido">
           <h2>Mi perfil</h2>
           <div className="perfil-form">
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
-              <div
-                className="perfil-avatar-grande"
-                onClick={() => inputFotoRef.current.click()}
-                style={{cursor:'pointer',position:'relative',overflow:'hidden'}}
-              >
-                {perfilAvatarUrl ? (
-                  <img src={perfilAvatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} />
-                ) : (
-                  perfilNombre ? perfilNombre[0].toUpperCase() : 'B'
-                )}
-                <div style={{
-                  position:'absolute',bottom:0,left:0,right:0,
-                  background:'rgba(0,0,0,0.5)',color:'white',
-                  fontSize:'11px',textAlign:'center',padding:'4px 0'
-                }}>
-                  {subiendoFoto ? 'Subiendo...' : 'Cambiar'}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:'16px',background:'white',borderRadius:'16px',padding:'20px'}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                <div className="perfil-avatar-grande" onClick={() => inputFotoRef.current.click()} style={{cursor:'pointer',position:'relative',overflow:'hidden'}}>
+                  {perfilAvatarUrl
+                    ? <img src={perfilAvatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} />
+                    : (perfilNombre ? perfilNombre[0].toUpperCase() : 'B')
+                  }
+                  <div style={{position:'absolute',bottom:0,left:0,right:0,background:'rgba(0,0,0,0.5)',color:'white',fontSize:'11px',textAlign:'center',padding:'4px 0'}}>
+                    {subiendoFoto ? 'Subiendo...' : 'Cambiar'}
+                  </div>
                 </div>
+                <input ref={inputFotoRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleSubirFoto} />
+                <p style={{fontSize:'11px',color:'#888'}}>Cambiar foto</p>
               </div>
-              <input
-                ref={inputFotoRef}
-                type="file"
-                accept="image/*"
-                style={{display:'none'}}
-                onChange={handleSubirFoto}
-              />
-              <p style={{fontSize:'12px',color:'#888'}}>Haz clic en la foto para cambiarla</p>
+              <div style={{width:'1px',height:'80px',background:'#eee'}} />
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                {!faceIdRegistrado ? (
+                  <button onClick={activarFaceId} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
+                    <svg width="48" height="48" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="2" y="2" width="12" height="4" rx="2" fill="#000"/><rect x="2" y="2" width="4" height="12" rx="2" fill="#000"/>
+                      <rect x="38" y="2" width="12" height="4" rx="2" fill="#000"/><rect x="46" y="2" width="4" height="12" rx="2" fill="#000"/>
+                      <rect x="2" y="46" width="12" height="4" rx="2" fill="#000"/><rect x="2" y="38" width="4" height="12" rx="2" fill="#000"/>
+                      <rect x="38" y="46" width="12" height="4" rx="2" fill="#000"/><rect x="46" y="38" width="4" height="12" rx="2" fill="#000"/>
+                      <circle cx="19" cy="22" r="2.5" fill="#000"/><circle cx="33" cy="22" r="2.5" fill="#000"/>
+                      <path d="M18 32 Q26 38 34 32" stroke="#000" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                      <line x1="26" y1="18" x2="26" y2="28" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'#000',textAlign:'center',letterSpacing:'0.5px'}}>ACTIVAR FACE ID</span>
+                  </button>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                    <svg width="48" height="48" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="2" y="2" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="2" y="2" width="4" height="12" rx="2" fill="#2D7D46"/>
+                      <rect x="38" y="2" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="46" y="2" width="4" height="12" rx="2" fill="#2D7D46"/>
+                      <rect x="2" y="46" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="2" y="38" width="4" height="12" rx="2" fill="#2D7D46"/>
+                      <rect x="38" y="46" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="46" y="38" width="4" height="12" rx="2" fill="#2D7D46"/>
+                      <circle cx="19" cy="22" r="2.5" fill="#2D7D46"/><circle cx="33" cy="22" r="2.5" fill="#2D7D46"/>
+                      <path d="M18 32 Q26 38 34 32" stroke="#2D7D46" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                      <line x1="26" y1="18" x2="26" y2="28" stroke="#2D7D46" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'#2D7D46',textAlign:'center'}}>FACE ID ✓</span>
+                    <button onClick={desactivarFaceId} style={{fontSize:'10px',color:'#bbb',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Desactivar</button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="campo-admin">
-              <label>Email</label>
-              <input type="email" value={sesion.user.email} disabled style={{background:'#f4f4f8',color:'#888'}} />
-            </div>
-            <div className="campo-admin">
-              <label>Nombre</label>
-              <input type="text" value={perfilNombre} onChange={e => setPerfilNombre(e.target.value)} placeholder="Tu nombre o nombre del negocio" />
-            </div>
-            <div className="campo-admin">
-              <label>Ciudad</label>
-              <input type="text" value={perfilCiudad} onChange={e => setPerfilCiudad(e.target.value)} placeholder="Tu ciudad" />
-            </div>
+            <div className="campo-admin"><label>Email</label><input type="email" value={sesion.user.email} disabled style={{background:'#f4f4f8',color:'#888'}} /></div>
+            <div className="campo-admin"><label>Nombre</label><input type="text" value={perfilNombre} onChange={e => setPerfilNombre(e.target.value)} placeholder="Tu nombre o nombre del negocio" /></div>
+            <div className="campo-admin"><label>Ciudad</label><input type="text" value={perfilCiudad} onChange={e => setPerfilCiudad(e.target.value)} placeholder="Tu ciudad" /></div>
             <div className="campo-admin">
               <label>Tu enlace de reservas</label>
               <div className="enlace-box">
-                <span style={{color:'#EF4444',fontSize:'13px'}}>
-                  {barberoSlug ? `bsapp-xi.vercel.app/b/${barberoSlug}` : 'bsapp-xi.vercel.app'}
-                </span>
+                <span>bsapp-xi.vercel.app</span>
                 <button className="btn-copiar" onClick={copiarEnlace}>Copiar</button>
               </div>
             </div>
-            {mensajePerfil && (
-              <p style={{
-                padding: '10px 14px',borderRadius: '8px',fontSize: '14px',
-                background: mensajePerfil.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',
-                color: mensajePerfil.tipo === 'ok' ? '#2D7D46' : '#EF4444'
-              }}>{mensajePerfil.texto}</p>
-            )}
-            <button className="btn-guardar" onClick={guardarPerfil} disabled={guardandoPerfil}>
-              {guardandoPerfil ? 'Guardando...' : 'Guardar cambios'}
-            </button>
+            {mensajePerfil && <p style={{padding:'10px 14px',borderRadius:'8px',fontSize:'14px',background: mensajePerfil.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',color: mensajePerfil.tipo === 'ok' ? '#2D7D46' : '#EF4444'}}>{mensajePerfil.texto}</p>}
+            <button className="btn-guardar" onClick={guardarPerfil} disabled={guardandoPerfil}>{guardandoPerfil ? 'Guardando...' : 'Guardar cambios'}</button>
           </div>
         </div>
       )}
