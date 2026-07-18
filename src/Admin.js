@@ -32,58 +32,9 @@ function Admin() {
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const inputFotoRef = useRef(null);
 
-  const [faceIdRegistrado, setFaceIdRegistrado] = useState(!!localStorage.getItem('bsapp_cred_id'));
-
   const [disponibilidad, setDisponibilidad] = useState({});
   const [guardandoHorario, setGuardandoHorario] = useState(false);
   const [mensajeHorario, setMensajeHorario] = useState(null);
-
-  const bufferToBase64 = (buffer) => {
-    const bin = String.fromCharCode(...new Uint8Array(buffer));
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-  };
-
-  const activarFaceId = async () => {
-    if (!window.PublicKeyCredential) {
-      setMensajePerfil({ tipo: 'error', texto: 'Tu dispositivo no soporta Face ID.' });
-      return;
-    }
-    try {
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge);
-      const userEmail = sesion.user.email;
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'BSAPP', id: window.location.hostname },
-          user: {
-            id: new TextEncoder().encode(userEmail),
-            name: userEmail,
-            displayName: perfilNombre || userEmail,
-          },
-          pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
-          timeout: 60000,
-        },
-      });
-      if (credential) {
-        localStorage.setItem('bsapp_cred_id', bufferToBase64(credential.rawId));
-        localStorage.setItem('bsapp_email', userEmail);
-        setFaceIdRegistrado(true);
-        setMensajePerfil({ tipo: 'ok', texto: '¡Face ID activado! La próxima vez entra sin contraseña.' });
-      }
-    } catch (err) {
-      setMensajePerfil({ tipo: 'error', texto: 'Face ID cancelado o no disponible.' });
-    }
-  };
-
-  const desactivarFaceId = () => {
-    localStorage.removeItem('bsapp_cred_id');
-    localStorage.removeItem('bsapp_email');
-    localStorage.removeItem('bsapp_password');
-    setFaceIdRegistrado(false);
-    setMensajePerfil({ tipo: 'ok', texto: 'Face ID desactivado.' });
-  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -407,51 +358,18 @@ function Admin() {
         <div className="admin-contenido">
           <h2>Mi perfil</h2>
           <div className="perfil-form">
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-around',marginBottom:'16px',background:'white',borderRadius:'16px',padding:'20px'}}>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
-                <div className="perfil-avatar-grande" onClick={() => inputFotoRef.current.click()} style={{cursor:'pointer',position:'relative',overflow:'hidden'}}>
-                  {perfilAvatarUrl
-                    ? <img src={perfilAvatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} />
-                    : (perfilNombre ? perfilNombre[0].toUpperCase() : 'B')
-                  }
-                  <div style={{position:'absolute',bottom:0,left:0,right:0,background:'rgba(0,0,0,0.5)',color:'white',fontSize:'11px',textAlign:'center',padding:'4px 0'}}>
-                    {subiendoFoto ? 'Subiendo...' : 'Cambiar'}
-                  </div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
+              <div className="perfil-avatar-grande" onClick={() => inputFotoRef.current.click()} style={{cursor:'pointer',position:'relative',overflow:'hidden'}}>
+                {perfilAvatarUrl
+                  ? <img src={perfilAvatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} />
+                  : (perfilNombre ? perfilNombre[0].toUpperCase() : 'B')
+                }
+                <div style={{position:'absolute',bottom:0,left:0,right:0,background:'rgba(0,0,0,0.5)',color:'white',fontSize:'11px',textAlign:'center',padding:'4px 0'}}>
+                  {subiendoFoto ? 'Subiendo...' : 'Cambiar'}
                 </div>
-                <input ref={inputFotoRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleSubirFoto} />
-                <p style={{fontSize:'11px',color:'#888'}}>Cambiar foto</p>
               </div>
-              <div style={{width:'1px',height:'80px',background:'#eee'}} />
-              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
-                {!faceIdRegistrado ? (
-                  <button onClick={activarFaceId} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
-                    <svg width="48" height="48" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2" y="2" width="12" height="4" rx="2" fill="#000"/><rect x="2" y="2" width="4" height="12" rx="2" fill="#000"/>
-                      <rect x="38" y="2" width="12" height="4" rx="2" fill="#000"/><rect x="46" y="2" width="4" height="12" rx="2" fill="#000"/>
-                      <rect x="2" y="46" width="12" height="4" rx="2" fill="#000"/><rect x="2" y="38" width="4" height="12" rx="2" fill="#000"/>
-                      <rect x="38" y="46" width="12" height="4" rx="2" fill="#000"/><rect x="46" y="38" width="4" height="12" rx="2" fill="#000"/>
-                      <circle cx="19" cy="22" r="2.5" fill="#000"/><circle cx="33" cy="22" r="2.5" fill="#000"/>
-                      <path d="M18 32 Q26 38 34 32" stroke="#000" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                      <line x1="26" y1="18" x2="26" y2="28" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span style={{fontSize:'10px',fontWeight:'700',color:'#000',textAlign:'center',letterSpacing:'0.5px'}}>ACTIVAR FACE ID</span>
-                  </button>
-                ) : (
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
-                    <svg width="48" height="48" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="2" y="2" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="2" y="2" width="4" height="12" rx="2" fill="#2D7D46"/>
-                      <rect x="38" y="2" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="46" y="2" width="4" height="12" rx="2" fill="#2D7D46"/>
-                      <rect x="2" y="46" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="2" y="38" width="4" height="12" rx="2" fill="#2D7D46"/>
-                      <rect x="38" y="46" width="12" height="4" rx="2" fill="#2D7D46"/><rect x="46" y="38" width="4" height="12" rx="2" fill="#2D7D46"/>
-                      <circle cx="19" cy="22" r="2.5" fill="#2D7D46"/><circle cx="33" cy="22" r="2.5" fill="#2D7D46"/>
-                      <path d="M18 32 Q26 38 34 32" stroke="#2D7D46" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                      <line x1="26" y1="18" x2="26" y2="28" stroke="#2D7D46" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span style={{fontSize:'10px',fontWeight:'700',color:'#2D7D46',textAlign:'center'}}>FACE ID ✓</span>
-                    <button onClick={desactivarFaceId} style={{fontSize:'10px',color:'#bbb',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Desactivar</button>
-                  </div>
-                )}
-              </div>
+              <input ref={inputFotoRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleSubirFoto} />
+              <p style={{fontSize:'12px',color:'#888'}}>Haz clic en la foto para cambiarla</p>
             </div>
             <div className="campo-admin"><label>Email</label><input type="email" value={sesion.user.email} disabled style={{background:'#f4f4f8',color:'#888'}} /></div>
             <div className="campo-admin"><label>Nombre</label><input type="text" value={perfilNombre} onChange={e => setPerfilNombre(e.target.value)} placeholder="Tu nombre o nombre del negocio" /></div>
