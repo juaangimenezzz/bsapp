@@ -6,8 +6,9 @@ import './Admin.css';
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const HORAS_DISPONIBLES = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '16:00', '16:30', '17:00', '17:30',
-  '18:00', '18:30',
+  '12:00', '12:30', '13:00', '13:30', '16:00', '16:30',
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00', '20:30', '21:00', '21:30',
 ];
 
 function Admin() {
@@ -379,14 +380,7 @@ function Admin() {
             <div className="campo-admin"><label>Ciudad</label><input type="text" value={perfilCiudad} onChange={e => setPerfilCiudad(e.target.value)} placeholder="Tu ciudad" /></div>
             <div className="campo-admin">
               <label>Teléfono WhatsApp</label>
-              <input
-                type="tel"
-                value={perfilTelefono}
-                onChange={e => setPerfilTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                placeholder="Ej: 612345678"
-                inputMode="numeric"
-                maxLength={9}
-              />
+              <input type="tel" value={perfilTelefono} onChange={e => setPerfilTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="Ej: 612345678" inputMode="numeric" maxLength={9} />
               <p style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Los clientes te enviarán la confirmación a este número</p>
             </div>
             <div className="campo-admin">
