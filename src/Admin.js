@@ -26,6 +26,7 @@ function Admin() {
 
   const [perfilNombre, setPerfilNombre] = useState('');
   const [perfilCiudad, setPerfilCiudad] = useState('');
+  const [perfilTelefono, setPerfilTelefono] = useState('');
   const [perfilAvatarUrl, setPerfilAvatarUrl] = useState(null);
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [mensajePerfil, setMensajePerfil] = useState(null);
@@ -55,15 +56,13 @@ function Admin() {
   const cargarDatos = async () => {
     setCargando(true);
     const { data: barbero } = await supabase
-      .from('barberos')
-      .select('*')
-      .eq('email', sesion.user.email)
-      .single();
+      .from('barberos').select('*').eq('email', sesion.user.email).single();
 
     if (barbero) {
       setBarberoIdReal(barbero.id);
       setPerfilNombre(barbero.nombre || '');
       setPerfilCiudad(barbero.ciudad || '');
+      setPerfilTelefono(barbero.telefono || '');
       setPerfilAvatarUrl(barbero.avatar_url || null);
 
       const { data: reservasData, error: reservasError } = await supabase
@@ -185,7 +184,9 @@ function Admin() {
   const guardarPerfil = async () => {
     setGuardandoPerfil(true);
     setMensajePerfil(null);
-    const { error } = await supabase.from('barberos').update({ nombre: perfilNombre, ciudad: perfilCiudad }).eq('id', barberoIdReal);
+    const { error } = await supabase.from('barberos')
+      .update({ nombre: perfilNombre, ciudad: perfilCiudad, telefono: perfilTelefono })
+      .eq('id', barberoIdReal);
     setGuardandoPerfil(false);
     if (error) { setMensajePerfil({ tipo: 'error', texto: 'Error al guardar.' }); }
     else { setMensajePerfil({ tipo: 'ok', texto: '¡Perfil actualizado correctamente!' }); }
@@ -214,9 +215,7 @@ function Admin() {
   return (
     <div className="admin">
       <header className="admin-header">
-        <div className="admin-header-left">
-          <h1>BSAPP</h1>
-        </div>
+        <div className="admin-header-left"><h1>BSAPP</h1></div>
         <div className="admin-perfil">
           <div className="admin-avatar">
             {perfilAvatarUrl
@@ -374,6 +373,18 @@ function Admin() {
             <div className="campo-admin"><label>Email</label><input type="email" value={sesion.user.email} disabled style={{background:'#f4f4f8',color:'#888'}} /></div>
             <div className="campo-admin"><label>Nombre</label><input type="text" value={perfilNombre} onChange={e => setPerfilNombre(e.target.value)} placeholder="Tu nombre o nombre del negocio" /></div>
             <div className="campo-admin"><label>Ciudad</label><input type="text" value={perfilCiudad} onChange={e => setPerfilCiudad(e.target.value)} placeholder="Tu ciudad" /></div>
+            <div className="campo-admin">
+              <label>Teléfono WhatsApp</label>
+              <input
+                type="tel"
+                value={perfilTelefono}
+                onChange={e => setPerfilTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                placeholder="Ej: 612345678"
+                inputMode="numeric"
+                maxLength={9}
+              />
+              <p style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Los clientes te enviarán la confirmación a este número</p>
+            </div>
             <div className="campo-admin">
               <label>Tu enlace de reservas</label>
               <div className="enlace-box">

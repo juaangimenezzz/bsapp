@@ -21,9 +21,8 @@ function ClienteApp() {
   const [horasPorDia, setHorasPorDia] = useState({});
   const [cargando, setCargando] = useState(true);
   const [barberoId, setBarberoId] = useState(null);
-  const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null, calendar_id: null });
+  const [barbero, setBarbero] = useState({ nombre: '', ciudad: '', avatar_url: null, calendar_id: null, telefono: null });
 
-  // Estados para cancelación
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [telefonoCancelacion, setTelefonoCancelacion] = useState('');
   const [reservasCliente, setReservasCliente] = useState([]);
@@ -51,45 +50,26 @@ function ClienteApp() {
   useEffect(() => {
     const cargarDatos = async () => {
       setCargando(true);
-
       let query = supabase.from('barberos').select('*');
-      if (slug) {
-        query = query.eq('slug', slug);
-      }
+      if (slug) query = query.eq('slug', slug);
       const { data: barberoData } = await query.single();
-
-      if (!barberoData) {
-        setCargando(false);
-        return;
-      }
-
+      if (!barberoData) { setCargando(false); return; }
       setBarbero(barberoData);
       setBarberoId(barberoData.id);
 
       const { data: serviciosData } = await supabase
-        .from('servicios')
-        .select('*')
-        .eq('barbero_id', barberoData.id)
-        .order('created_at', { ascending: true });
-
+        .from('servicios').select('*').eq('barbero_id', barberoData.id).order('created_at', { ascending: true });
       if (serviciosData && serviciosData.length > 0) {
         const serviciosFormateados = serviciosData.map(s => ({
-          id: s.id,
-          nombre: s.nombre,
-          duracion: s.duracion,
-          duracionTexto: `${s.duracion} min`,
-          precio: `${s.precio}€`,
+          id: s.id, nombre: s.nombre, duracion: s.duracion,
+          duracionTexto: `${s.duracion} min`, precio: `${s.precio}€`,
         }));
         setServicios(serviciosFormateados);
         setServicioSeleccionado(serviciosFormateados[0].nombre);
       }
 
       const { data: dispData } = await supabase
-        .from('disponibilidad')
-        .select('*')
-        .eq('barbero_id', barberoData.id)
-        .eq('activo', true);
-
+        .from('disponibilidad').select('*').eq('barbero_id', barberoData.id).eq('activo', true);
       if (dispData && dispData.length > 0) {
         const porDia = {};
         dispData.forEach(d => {
@@ -101,7 +81,6 @@ function ClienteApp() {
         setDiasDisponibles(dias);
         if (dias.length > 0) setDiaSeleccionado(dias[0]);
       }
-
       setCargando(false);
     };
     cargarDatos();
@@ -112,14 +91,9 @@ function ClienteApp() {
     const cargarHorasOcupadas = async () => {
       const fecha = formatearFecha(obtenerFecha(diaSeleccionado));
       const { data, error } = await supabase
-        .from('reservas')
-        .select('hora')
-        .eq('fecha', fecha)
-        .eq('barbero_id', barberoId)
-        .neq('estado', 'cancelada');
-      if (!error && data) {
-        setHorasOcupadas(data.map(r => r.hora.slice(0, 5)));
-      }
+        .from('reservas').select('hora').eq('fecha', fecha)
+        .eq('barbero_id', barberoId).neq('estado', 'cancelada');
+      if (!error && data) setHorasOcupadas(data.map(r => r.hora.slice(0, 5)));
     };
     cargarHorasOcupadas();
     setHoraSeleccionada(null);
@@ -128,8 +102,7 @@ function ClienteApp() {
 
   const horas = diaSeleccionado
     ? (horasPorDia[diaSeleccionado] || []).sort().map(hora => ({
-        hora,
-        ocupada: horasOcupadas.includes(hora),
+        hora, ocupada: horasOcupadas.includes(hora),
       }))
     : [];
 
@@ -138,31 +111,20 @@ function ClienteApp() {
     setTelefono(valor);
   };
 
-  const handleSiguiente = () => {
-    if (horaSeleccionada) setPaso(2);
-  };
+  const handleSiguiente = () => { if (horaSeleccionada) setPaso(2); };
 
   const handleConfirmar = async () => {
     if (!nombre.trim() || telefono.length !== 9) return;
-
     setGuardando(true);
     setError(null);
-
     const precioNumerico = parseInt(servicioInfo.precio.replace('€', ''), 10);
     const fecha = formatearFecha(obtenerFecha(diaSeleccionado));
 
-    const { error: errorReserva } = await supabase
-      .from('reservas')
-      .insert([{
-        barbero_id: barberoId,
-        servicio_id: null,
-        cliente_nombre: nombre,
-        cliente_telefono: telefono,
-        fecha,
-        hora: horaSeleccionada,
-        estado: 'pendiente',
-        precio: precioNumerico
-      }]);
+    const { error: errorReserva } = await supabase.from('reservas').insert([{
+      barbero_id: barberoId, servicio_id: null, cliente_nombre: nombre,
+      cliente_telefono: telefono, fecha, hora: horaSeleccionada,
+      estado: 'pendiente', precio: precioNumerico
+    }]);
 
     if (errorReserva) {
       setError('Ha habido un error al guardar la reserva. Inténtalo de nuevo.');
@@ -176,21 +138,24 @@ function ClienteApp() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            calendarId: barbero.calendar_id,
-            fecha,
-            hora: horaSeleccionada,
-            clienteNombre: nombre,
-            servicio: servicioSeleccionado,
-            duracion: servicioInfo.duracion,
+            calendarId: barbero.calendar_id, fecha, hora: horaSeleccionada,
+            clienteNombre: nombre, servicio: servicioSeleccionado, duracion: servicioInfo.duracion,
           }),
         });
-      } catch (e) {
-        console.error('Error creando evento en calendar:', e);
-      }
+      } catch (e) { console.error('Error creando evento en calendar:', e); }
     }
 
     setGuardando(false);
     setPaso(3);
+  };
+
+  const enviarWhatsApp = () => {
+    if (!barbero.telefono) return;
+    const fecha = formatearFecha(obtenerFecha(diaSeleccionado));
+    const mensaje = `Hola, acabo de reservar una cita en BSAPP. Nombre: ${nombre}, Servicio: ${servicioSeleccionado}, Día: ${fecha}, Hora: ${horaSeleccionada}. Accede a la App para confirmarla ¡Hasta pronto!`;
+    const numero = barbero.telefono.replace(/\D/g, '');
+    const url = `https://wa.me/34${numero}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
   };
 
   const buscarReservas = async () => {
@@ -198,25 +163,16 @@ function ClienteApp() {
     setBuscandoReservas(true);
     setMensajeCancelacion(null);
     const hoy = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('reservas')
-      .select('*')
-      .eq('cliente_telefono', telefonoCancelacion)
-      .eq('barbero_id', barberoId)
-      .neq('estado', 'cancelada')
-      .gte('fecha', hoy)
-      .order('fecha', { ascending: true });
+    const { data, error } = await supabase.from('reservas').select('*')
+      .eq('cliente_telefono', telefonoCancelacion).eq('barbero_id', barberoId)
+      .neq('estado', 'cancelada').gte('fecha', hoy).order('fecha', { ascending: true });
     if (!error) setReservasCliente(data || []);
     setBuscandoReservas(false);
   };
 
   const cancelarReserva = async (reserva) => {
     setCancelando(reserva.id);
-    const { error } = await supabase
-      .from('reservas')
-      .update({ estado: 'cancelada' })
-      .eq('id', reserva.id);
-
+    const { error } = await supabase.from('reservas').update({ estado: 'cancelada' }).eq('id', reserva.id);
     if (!error) {
       if (barbero.calendar_id) {
         try {
@@ -224,15 +180,11 @@ function ClienteApp() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              calendarId: barbero.calendar_id,
-              fecha: reserva.fecha,
-              hora: reserva.hora.slice(0, 5),
-              clienteNombre: reserva.cliente_nombre,
+              calendarId: barbero.calendar_id, fecha: reserva.fecha,
+              hora: reserva.hora.slice(0, 5), clienteNombre: reserva.cliente_nombre,
             }),
           });
-        } catch (e) {
-          console.error('Error eliminando evento:', e);
-        }
+        } catch (e) { console.error('Error eliminando evento:', e); }
       }
       setReservasCliente(prev => prev.filter(r => r.id !== reserva.id));
       setMensajeCancelacion({ tipo: 'ok', texto: '¡Cita cancelada correctamente!' });
@@ -245,10 +197,7 @@ function ClienteApp() {
   if (cargando) {
     return (
       <div className="app">
-        <header className="header">
-          <h1>BSAPP</h1>
-          <p>Reserva tu cita de la manera más sencilla</p>
-        </header>
+        <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
         <div style={{padding:'40px',textAlign:'center',color:'#888'}}>Cargando...</div>
       </div>
     );
@@ -257,10 +206,7 @@ function ClienteApp() {
   if (!barbero.nombre) {
     return (
       <div className="app">
-        <header className="header">
-          <h1>BSAPP</h1>
-          <p>Reserva tu cita de la manera más sencilla</p>
-        </header>
+        <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
         <div style={{padding:'40px',textAlign:'center',color:'#888'}}>Barbero no encontrado.</div>
       </div>
     );
@@ -269,10 +215,7 @@ function ClienteApp() {
   if (mostrarCancelacion) {
     return (
       <div className="app">
-        <header className="header">
-          <h1>BSAPP</h1>
-          <p>Reserva tu cita de la manera más sencilla</p>
-        </header>
+        <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
         <div className="seccion">
           <button className="btn-volver" onClick={() => { setMostrarCancelacion(false); setTelefonoCancelacion(''); setReservasCliente([]); setMensajeCancelacion(null); }}>← Volver</button>
           <h3 style={{marginTop:'12px'}}>Cancelar mi cita</h3>
@@ -280,33 +223,21 @@ function ClienteApp() {
           <div className="formulario">
             <div className="campo">
               <label>Tu teléfono</label>
-              <input
-                type="tel"
-                placeholder="Ej: 612345678"
-                value={telefonoCancelacion}
+              <input type="tel" placeholder="Ej: 612345678" value={telefonoCancelacion}
                 onChange={e => setTelefonoCancelacion(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                inputMode="numeric"
-                maxLength={9}
-              />
+                inputMode="numeric" maxLength={9} />
             </div>
           </div>
-          <button
-            className={`btn-reservar ${telefonoCancelacion.length !== 9 ? 'deshabilitado' : ''}`}
-            onClick={buscarReservas}
-            disabled={telefonoCancelacion.length !== 9 || buscandoReservas}
-            style={{marginTop:'16px'}}
-          >
+          <button className={`btn-reservar ${telefonoCancelacion.length !== 9 ? 'deshabilitado' : ''}`}
+            onClick={buscarReservas} disabled={telefonoCancelacion.length !== 9 || buscandoReservas}
+            style={{marginTop:'16px'}}>
             {buscandoReservas ? 'Buscando...' : 'Buscar mis citas'}
           </button>
-
           {mensajeCancelacion && (
-            <p style={{
-              padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginTop:'16px',
+            <p style={{padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginTop:'16px',
               background: mensajeCancelacion.tipo === 'ok' ? '#EAF3DE' : '#FEE2E2',
-              color: mensajeCancelacion.tipo === 'ok' ? '#2D7D46' : '#EF4444'
-            }}>{mensajeCancelacion.texto}</p>
+              color: mensajeCancelacion.tipo === 'ok' ? '#2D7D46' : '#EF4444'}}>{mensajeCancelacion.texto}</p>
           )}
-
           {reservasCliente.length > 0 && (
             <div style={{marginTop:'20px',display:'flex',flexDirection:'column',gap:'12px'}}>
               <h3>Tus citas activas</h3>
@@ -317,22 +248,14 @@ function ClienteApp() {
                     <p style={{fontSize:'13px',color:'#888',marginTop:'4px'}}>{r.hora?.slice(0,5)} · {r.cliente_nombre}</p>
                     <p style={{fontSize:'12px',color:'#aaa',marginTop:'2px',textTransform:'capitalize'}}>{r.estado}</p>
                   </div>
-                  <button
-                    onClick={() => cancelarReserva(r)}
-                    disabled={cancelando === r.id}
-                    style={{
-                      padding:'8px 16px',borderRadius:'8px',border:'none',
-                      background:'#EF4444',color:'white',fontSize:'13px',
-                      fontWeight:'600',cursor:'pointer'
-                    }}
-                  >
+                  <button onClick={() => cancelarReserva(r)} disabled={cancelando === r.id}
+                    style={{padding:'8px 16px',borderRadius:'8px',border:'none',background:'#EF4444',color:'white',fontSize:'13px',fontWeight:'600',cursor:'pointer'}}>
                     {cancelando === r.id ? 'Cancelando...' : 'Cancelar'}
                   </button>
                 </div>
               ))}
             </div>
           )}
-
           {!buscandoReservas && reservasCliente.length === 0 && telefonoCancelacion.length === 9 && mensajeCancelacion === null && (
             <p style={{color:'#888',fontSize:'14px',marginTop:'16px',textAlign:'center'}}>No se han encontrado citas activas con este número.</p>
           )}
@@ -341,16 +264,14 @@ function ClienteApp() {
     );
   }
 
+  // ── PASO 3: Confirmación con botón WhatsApp ──────────────────────────────
   if (paso === 3) {
     return (
       <div className="app">
-        <header className="header">
-          <h1>BSAPP</h1>
-          <p>Reserva tu cita de la manera más sencilla</p>
-        </header>
+        <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
         <div className="confirmacion-pantalla">
           <div className="confirmacion-icono">✅</div>
-          <h2>¡Reserva confirmada!</h2>
+          <h2>¡Reserva enviada!</h2>
           <p className="confirmacion-nombre">Hola, <strong>{nombre}</strong></p>
           <div className="confirmacion-detalle">
             <div className="detalle-fila">
@@ -374,6 +295,27 @@ function ClienteApp() {
               <span className="detalle-valor precio-final">{servicioInfo.precio}</span>
             </div>
           </div>
+
+          {barbero.telefono && (
+            <>
+              <p style={{fontSize:'14px',color:'#888',margin:'20px 0 12px',textAlign:'center'}}>
+                Avisa a tu barbero por WhatsApp para que confirme tu cita:
+              </p>
+              <button
+                onClick={enviarWhatsApp}
+                style={{
+                  width:'100%', padding:'14px', borderRadius:'12px', border:'none',
+                  background:'#25D366', color:'white', fontSize:'16px',
+                  fontWeight:'700', cursor:'pointer', display:'flex',
+                  alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'12px'
+                }}
+              >
+                <span style={{fontSize:'22px'}}>💬</span>
+                Enviar confirmación por WhatsApp
+              </button>
+            </>
+          )}
+
           <p className="confirmacion-sub">¡Hasta pronto!</p>
           <button className="btn-reservar" onClick={() => { setPaso(1); setHoraSeleccionada(null); setNombre(''); setTelefono(''); }}>
             Hacer otra reserva
@@ -386,30 +328,15 @@ function ClienteApp() {
   if (paso === 2) {
     return (
       <div className="app">
-        <header className="header">
-          <h1>BSAPP</h1>
-          <p>Reserva tu cita de la manera más sencilla</p>
-        </header>
+        <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
         <div className="seccion">
           <button className="btn-volver" onClick={() => setPaso(1)}>← Volver</button>
           <h3 style={{marginTop: '12px'}}>Resumen de tu reserva</h3>
           <div className="resumen">
-            <div className="detalle-fila">
-              <span className="detalle-label">Servicio</span>
-              <span className="detalle-valor">{servicioSeleccionado}</span>
-            </div>
-            <div className="detalle-fila">
-              <span className="detalle-label">Día</span>
-              <span className="detalle-valor" style={{textTransform:'capitalize'}}>{diaSeleccionado}</span>
-            </div>
-            <div className="detalle-fila">
-              <span className="detalle-label">Hora</span>
-              <span className="detalle-valor">{horaSeleccionada}</span>
-            </div>
-            <div className="detalle-fila">
-              <span className="detalle-label">Precio</span>
-              <span className="detalle-valor precio-final">{servicioInfo.precio}</span>
-            </div>
+            <div className="detalle-fila"><span className="detalle-label">Servicio</span><span className="detalle-valor">{servicioSeleccionado}</span></div>
+            <div className="detalle-fila"><span className="detalle-label">Día</span><span className="detalle-valor" style={{textTransform:'capitalize'}}>{diaSeleccionado}</span></div>
+            <div className="detalle-fila"><span className="detalle-label">Hora</span><span className="detalle-valor">{horaSeleccionada}</span></div>
+            <div className="detalle-fila"><span className="detalle-label">Precio</span><span className="detalle-valor precio-final">{servicioInfo.precio}</span></div>
           </div>
         </div>
         <div className="seccion">
@@ -417,33 +344,17 @@ function ClienteApp() {
           <div className="formulario">
             <div className="campo">
               <label>Nombre completo</label>
-              <input
-                type="text"
-                placeholder="Ej: Carlos García"
-                value={nombre}
-                onChange={e => setNombre(e.target.value)}
-                maxLength={30}
-              />
+              <input type="text" placeholder="Ej: Carlos García" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={30} />
             </div>
             <div className="campo">
               <label>Teléfono</label>
-              <input
-                type="tel"
-                placeholder="Ej: 612345678"
-                value={telefono}
-                onChange={handleTelefono}
-                maxLength={9}
-                inputMode="numeric"
-              />
+              <input type="tel" placeholder="Ej: 612345678" value={telefono} onChange={handleTelefono} maxLength={9} inputMode="numeric" />
             </div>
           </div>
           {error && <p style={{color: 'red', fontSize: '14px', marginTop: '10px'}}>{error}</p>}
           <button
             className={`btn-reservar ${(!nombre.trim() || telefono.length !== 9) ? 'deshabilitado' : ''}`}
-            onClick={handleConfirmar}
-            style={{marginTop: '20px'}}
-            disabled={guardando}
-          >
+            onClick={handleConfirmar} style={{marginTop: '20px'}} disabled={guardando}>
             {guardando ? 'Guardando...' : 'Confirmar reserva'}
           </button>
         </div>
@@ -453,10 +364,7 @@ function ClienteApp() {
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>BSAPP</h1>
-        <p>Reserva tu cita de la manera más sencilla</p>
-      </header>
+      <header className="header"><h1>BSAPP</h1><p>Reserva tu cita de la manera más sencilla</p></header>
       <div className="perfil">
         <div className="avatar">
           {barbero.avatar_url
@@ -468,14 +376,9 @@ function ClienteApp() {
           <h2>{barbero.nombre || 'Cargando...'}</h2>
           <p>📍 {barbero.ciudad || ''}</p>
         </div>
-        <button
-          onClick={() => setMostrarCancelacion(true)}
-          style={{
-            marginLeft:'auto',padding:'8px 16px',borderRadius:'8px',
-            border:'none',background:'#EF4444',color:'white',
-            fontSize:'13px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'
-          }}
-        >
+        <button onClick={() => setMostrarCancelacion(true)}
+          style={{marginLeft:'auto',padding:'8px 16px',borderRadius:'8px',border:'none',
+            background:'#EF4444',color:'white',fontSize:'13px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap'}}>
           Cancelar cita
         </button>
       </div>
@@ -487,15 +390,9 @@ function ClienteApp() {
         ) : (
           <div className="servicios">
             {servicios.map((s) => (
-              <div
-                key={s.id}
-                className={`servicio ${servicioSeleccionado === s.nombre ? 'activo' : ''}`}
-                onClick={() => setServicioSeleccionado(s.nombre)}
-              >
-                <div>
-                  <p className="nombre">{s.nombre}</p>
-                  <p className="duracion">⏱ {s.duracionTexto}</p>
-                </div>
+              <div key={s.id} className={`servicio ${servicioSeleccionado === s.nombre ? 'activo' : ''}`}
+                onClick={() => setServicioSeleccionado(s.nombre)}>
+                <div><p className="nombre">{s.nombre}</p><p className="duracion">⏱ {s.duracionTexto}</p></div>
                 <p className="precio">{s.precio}</p>
               </div>
             ))}
@@ -514,11 +411,7 @@ function ClienteApp() {
               const numero = fecha.getDate();
               const nombreCorto = dia.slice(0, 3);
               return (
-                <div
-                  key={dia}
-                  className={`dia ${diaSeleccionado === dia ? 'activo' : ''}`}
-                  onClick={() => setDiaSeleccionado(dia)}
-                >
+                <div key={dia} className={`dia ${diaSeleccionado === dia ? 'activo' : ''}`} onClick={() => setDiaSeleccionado(dia)}>
                   <p className="dia-nombre">{nombreCorto}</p>
                   <p className="dia-numero">{numero}</p>
                 </div>
@@ -535,11 +428,8 @@ function ClienteApp() {
         ) : (
           <div className="horas">
             {horas.map((h) => (
-              <div
-                key={h.hora}
-                className={`hora ${horaSeleccionada === h.hora ? 'activo' : ''} ${h.ocupada ? 'ocupada' : ''}`}
-                onClick={() => !h.ocupada && setHoraSeleccionada(h.hora)}
-              >
+              <div key={h.hora} className={`hora ${horaSeleccionada === h.hora ? 'activo' : ''} ${h.ocupada ? 'ocupada' : ''}`}
+                onClick={() => !h.ocupada && setHoraSeleccionada(h.hora)}>
                 {h.hora}
               </div>
             ))}
@@ -548,13 +438,8 @@ function ClienteApp() {
       </div>
 
       <div className="seccion">
-        <button
-          className={`btn-reservar ${!horaSeleccionada ? 'deshabilitado' : ''}`}
-          onClick={handleSiguiente}
-        >
-          {horaSeleccionada
-            ? `Continuar · ${servicioSeleccionado} · ${horaSeleccionada}`
-            : 'Selecciona una hora para continuar'}
+        <button className={`btn-reservar ${!horaSeleccionada ? 'deshabilitado' : ''}`} onClick={handleSiguiente}>
+          {horaSeleccionada ? `Continuar · ${servicioSeleccionado} · ${horaSeleccionada}` : 'Selecciona una hora para continuar'}
         </button>
       </div>
     </div>
